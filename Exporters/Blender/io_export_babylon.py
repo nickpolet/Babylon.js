@@ -27,10 +27,14 @@ def menu_func(self, context):
 def register():
     bpy.utils.register_module(__name__)
     bpy.types.INFO_MT_file_export.append(menu_func)
+    bpy.app.handlers.save_post.append(save_handler)
+
 
 def unregister():
     bpy.utils.unregister_module(__name__)
     bpy.types.INFO_MT_file_export.remove(menu_func)
+    bpy.app.handlers.save_post.remove(save_handler)
+
 
 if __name__ == '__main__':
     register()
@@ -327,8 +331,15 @@ class Main(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
 
             bpy.context.scene.frame_set(currentFrame)
 
+            # Save in the current directory if autosave is on
+            if not self.filepathMinusExtension and scene.babylon_autosave:
+                path = bpy.data.filepath.replace('.blend', '.babylon')
+                Main.warn('Babylon file saved')
+            else:
+                path = self.filepathMinusExtension + '.babylon'
+
             # output file
-            self.to_scene_file   ()
+            self.to_scene_file   (path)
 
         except:# catch *all* exceptions
             ex = sys.exc_info()
@@ -353,10 +364,10 @@ class Main(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
 
         return {'FINISHED'}
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    def to_scene_file(self):
+    def to_scene_file(self, path):
         Main.log('========= Writing of scene file started =========', 0)
         # Open file
-        file_handler = io.open(self.filepathMinusExtension + '.babylon', 'w', encoding='utf8')
+        file_handler = io.open(path, 'w', encoding='utf8')
         file_handler.write('{')
         self.world.to_scene_file(file_handler)
 
@@ -2399,6 +2410,39 @@ bpy.types.Lamp.shadowBlurBoxOffset = bpy.props.IntProperty(
     description='',
     default = 0
 )
+
+#
+#    Menu for Babylon.js settings
+#
+class BabylonPanel(bpy.types.Panel):
+    bl_category = "Babylon"
+    bl_label = "Babylon.js Settings"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "TOOLS"
+
+    bpy.types.Scene.babylon_autosave = bpy.props.BoolProperty(
+        name="Autosave",
+        description="Automatically creates a .babylon file when saving",
+        default = False,
+        )
+ 
+    def draw(self, context):
+
+        layout = self.layout
+
+        scene = context.scene
+        layout.prop(scene, "babylon_autosave")
+
+
+def save_handler(dummy):
+
+    scene = bpy.context.scene
+    scene['autosave'] = True
+
+    if scene.babylon_autosave:
+
+        bpy.ops.scene.babylon()
+
 
 class ObjectPanel(bpy.types.Panel):
     bl_label = 'Babylon.js'
